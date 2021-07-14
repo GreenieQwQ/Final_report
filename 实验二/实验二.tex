@@ -55,7 +55,8 @@
 \maketitle
 \begin{abstract}
  
- 在本次实验中，我们小组完成了三层BP网络的错误反传算法，实现了百分之70以上的准确率。同时，我们就优化器、批量归一化、丢弃法等BP神经网络常见优化方法进行了探究。%hc
+ 在本次实验中，我们小组完成了三层BP网络的错误反传算法，实现了百分之70以上的准确率。同时，我们就优化器、批量归一化、丢弃法等BP神经网络常见优化方法进行了探究。此外我们还实现了一个卷积神经网络，结合tkinter编写可交互界面进行手写数字的识别。
+ %hc
  \keywords{BP神经网络 \quad 卷积神经网络 \quad 批量归一化 \quad 丢弃法}
 \end{abstract}
 
@@ -333,8 +334,119 @@ $$
 	\item 当批量归一化和丢弃法同时使用时，BP网络的性能在准确率、迭代次数等方面都有所下降。
 	\end{itemize}
 	其中第三点出现的原因我们推测为批量归一化在某种程度上防止过拟合的功能\cite{3}和丢弃法有所冲突，从而导致了BP网络的性能在准确率、迭代次数等方面性能的下降。
-	
+\section{卷积神经网络}
+本次实验我们使用经典LeNet的改进版网络，其结构如下所示：
+\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.8\textwidth]{CNN}
+		\caption{CNN网络结构}
+	\end{figure}
+我们采用两个卷积层，一个batchnorm层，使用一个简单的架构进行手写数字的识别。使用pytorch搭建，代码核心如下：
+\begin{lstlisting}[language=python]
+class NetM(nn.Module):
+    def __init__(self):
+        super(NetM, self).__init__()
+        self.conv1 = nn.Conv2d(1, 8, 5)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(8, 16, 5)
+        self.fc1 = nn.Linear(256, 32)
+        self.bn = nn.BatchNorm1d(32)
+        self.fc2 = nn.Linear(32, 10)
 
+    def forward(self, x):
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = x.view(-1, 16 * 4 * 4)
+        #x = F.relu(self.bn(self.fc1(x)))
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+\end{lstlisting}
+由于手写数字数据集较为简单，很快就训练出98.5\%的准确率，训练时loss下降得很快，只需要3个epoch，下图分别为每个epoch训练后的准确率：
+\begin{figure}[H]
+		\centering
+		\includegraphics[width=1\textwidth]{loss}
+		\caption{CNN训练loss下降}
+	\end{figure}
+\section{结论-卷积神经网络}
+在本次实验中，我们小组完成了2层卷积层的卷积神经网络，实现了98\%准确率，简单卷积网络已经能达到较高的准确率，使用深层网络准确率也类似简单网络的情况。并且手写图片本身较小，无法支持深层网络的传播，需要结合ResNet的实践。电脑算力有限，无法进行ResNet的运算。
+\section{手写数字识别}
+结合tkinter和PIL.ImageDraw包，可以实现互动手写数字的识别。\par
+tkinter负责画布绘制，使用tkinter需要先声明组件，然后给定组件的位置。
+\begin{lstlisting}[language=python]
+app = tk.Tk()
+app.title('MNIST!')
+app['width'] = 800
+app['height'] = 600
+# 设置预测标签
+var = tk.IntVar(value=1)    
+# 将label标签的内容设置为字符类型，用var来接收hit_me函数的传出内容用以显示在标签上
+l = tk.Label(app, text="predict", bg='green', fg='white',
+             font=('Arial', 12), width=30, height=2)
+l.pack()
+b = tk.Button(app, text='clear', font=('Arial', 12),
+              width=10, height=1, command=clear)
+b.pack()
+image = tk.PhotoImage()
+canvas = tk.Canvas(app, bg='#000000', width=600, height=600)
+canvas.create_image(600, 600, image=image)
+\end{lstlisting}
+这样就得到了一个界面，一个标签，一个按钮和一块画布，标签用于显示预测结果，按钮用于情况画布。
+\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.8\textwidth]{draw}
+		\caption{手写数字识别界面}
+	\end{figure}
+为了实现绘制功能，要将函数绑定到界面中
+\begin{lstlisting}[language=python]
+canvas.bind('<Button-1>', onLeftButtonDown)
+canvas.bind('<B1-Motion>', onLeftButtonMove)
+canvas.bind('<ButtonRelease-1>', onLeftButtonUp)
+\end{lstlisting}
+实现了以上函数后，就能成功在在屏幕中显示绘制结果，但是为了能够事实进行预测，还需要ImagDraw同步画图，转换为28*28大小的图片进行预测。
+\begin{lstlisting}[language=python]
+image1 = Image.new("RGB", (width, height), (0, 0, 0))
+draw = ImageDraw.Draw(image1)
+draw.line([X.get(), Y.get(), event.x, event.y], fill=foreColor, width=8)
+\end{lstlisting}
+从ImageDraw获取图片,将大小为560*560的分为20*20,取平均值作为缩小后图片的每个像素。
+\begin{lstlisting}[language=python]
+def get_photo():
+    img = image1
+    x, y = img.size
+    print("x, y", x, y)
+
+    img = img.convert('L')
+    raw_data = img.load()
+
+    L = np.array([[raw_data[j, i] for j in range(img.size[0])]
+                 for i in range(img.size[1])])
+
+    im = np.zeros([28, 28]).astype(int)
+    for i in range(28):
+        for j in range(28):
+            im[i][j] = int(L[i*20:(i+1)*20, j*20:(j+1)*20].sum() / (20**2))
+
+    return im
+\end{lstlisting}
+进行预测时，首先读取训练好的模型，然后把预测结果写入到label中：
+\begin{lstlisting}[language=python]
+PATH = './MNIST_CNN_m2'
+net = NetM()
+net.load_state_dict(torch.load(PATH))
+softmax = torch.nn.Softmax()
+def pred():
+    data = torch.Tensor(get_photo()).reshape(1, 1, 28, 28)
+    prediction = net(data)
+    predicted = torch.max(prediction, 1)
+    l['text'] = int(predicted.indices)
+\end{lstlisting}
+最终，我们的可交互手写数字识别展示如下：
+\begin{figure}[H]
+		\centering
+		\includegraphics[width=1\textwidth]{pred}
+		\caption{手写数字预测}
+	\end{figure}
 %hc 卷积神经网络的1.实验过程、2.结果分析和3.结论、
 
 
