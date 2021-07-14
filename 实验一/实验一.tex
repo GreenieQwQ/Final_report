@@ -1,0 +1,245 @@
+\documentclass[withoutpreface,bwprint]{cumcmthesis} %去掉封面与编号页
+\title{实验报告-实验一}
+\author{18340206张德龙 \\
+	zhangdlong3@mail2.sysu.edu.cn
+}
+\date{\today}
+\usepackage[cache=false]{minted}
+\usepackage{diagbox}
+%\usepackage{fancyhdr}
+%\pagestyle{empty} 
+{\renewcommand\fcolorbox[4][]{\textcolor{cyan}{\strut#4}} %屏蔽汇编语言mint的错误
+\graphicspath{{figure/}}
+
+\let\algorithm\relax  
+\let\endalgorithm\relax 
+\usepackage[linesnumbered,ruled,lined]{algorithm2e}
+\usepackage{algpseudocode}  
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}   
+\renewcommand{\algorithmicensure}{\textbf{Output:}}   
+\SetKwFor{For}{for}{do}{endfor}
+\newcommand{\ret}{\textbf{return}}   
+
+\makeatletter
+\newenvironment{breakablealgorithm}
+{% \begin{breakablealgorithm}
+	\begin{center}
+		\refstepcounter{algorithm}% New algorithm
+		\hrule height.8pt depth0pt \kern2pt% \@fs@pre for \@fs@ruled
+		\renewcommand{\caption}[2][\relax]{% Make a new \caption
+			{\raggedright\textbf{\ALG@name~\thealgorithm} ##2\par}%
+			\ifx\relax##1\relax % #1 is \relax
+			\addcontentsline{loa}{algorithm}{\protect\numberline{\thealgorithm}##2}%
+			\else % #1 is not \relax
+			\addcontentsline{loa}{algorithm}{\protect\numberline{\thealgorithm}##1}%
+			\fi
+			\kern2pt\hrule\kern2pt
+		}
+	}{% \end{breakablealgorithm}
+		\kern2pt\hrule\relax% \@fs@post for \@fs@ruled
+	\end{center}
+}
+\makeatother
+
+\newcounter{Emp}[subsubsection]	% 设置计数器
+\newcommand{\kuohao}{\addtocounter{Emp}{1} \noindent （\theEmp）}
+
+\usepackage{amssymb}% http://ctan.org/pkg/amssymb
+\usepackage{pifont}% http://ctan.org/pkg/pifont
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
+
+\usepackage{threeparttable}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+ 
+ 在本次实验中，我们小组实现了模拟退火算法个遗传算法，并且进行了多个对比实验。模拟退火实验结果显示了区间翻转邻域操作在寻找TSP解上具有一定的优越性；并且结果显示，采取单一邻域操作的效果比不上结合先验知识，依据概率选取邻域操作的混合邻域操作。 %hc
+ \keywords{模拟退火 \quad 遗传算法 \quad 混合邻域}
+\end{abstract}
+
+\section{导言}
+
+在TSPLIB\footnote{http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/}中选一个大于100个城市数的TSP问题，采用模拟退火算法和遗传算法求解。模拟退火算法要求如下：
+\begin{enumerate}
+\item 采用多种邻域操作的局部搜索local search策略求解；
+\item 在局部搜索策略的基础上，加入模拟退火simulated annealing策略，并比较两者效果；
+\item 要求求得的解不要超过最优值的10％，并能够提供可视化。
+\end{enumerate}
+
+
+遗传算法要求如下：
+\begin{enumerate}
+\item 设计较好的交叉操作，并且引入多种局部搜索操作；
+\item 和之前的模拟退火算法（采用相同的局部搜索操作）进行比较；
+\item 得出设计高效遗传算法的一些经验，并比较单点搜索和多点搜索的优缺点。
+\end{enumerate}
+	
+
+\section{实验过程-模拟退火算法}
+
+\subsection{多种邻域操作的局部搜索}
+局部搜索算法是在一组可行解的基础上，在当前解的领域内进行局部搜索产生新的可行解的过程。局部搜索是解决最优化问题的一种启发式算法。对于某些计算起来非常复杂的最优化问题，比如各种NP完全问题，要找到最优解需要的时间随问题规模呈指数增长，因此诞生了各种启发式算法来退而求其次寻找次优解，是一种近似算法（Approximate  algorithm），基于以时间换精度的思想。局部搜索就是其中的一种方法。
+\subsubsection{多种邻域操作}
+
+参考文献\cite{1}中的多种启发式邻域操作，本次实验中我们小组所使用的邻域操作有：
+
+\kuohao 两点交换：
+
+本邻域操作的动作为将路径中的随机两点进行交换操作：
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.5\linewidth]{swap}
+	\caption{两点交换}
+\end{figure}
+
+\kuohao 区间翻转：
+
+本邻域操作的动作为将路径中的随机区间进行翻转操作：
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.5\linewidth]{reverse}
+	\caption{区间翻转}
+\end{figure}
+\kuohao 随机置顶：
+
+本邻域操作的动作为随机选取路径中的两点并顶置，其余点顺序不变：
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.5\linewidth]{rd_top}
+	\caption{随机置顶}
+\end{figure}
+
+\subsubsection{实验设置及结果}
+随机初始化解，采用早停法，为了与模拟退火对标，局部搜索同样设置内循环，循环次数为解长度的10倍，早停法容忍次数设置为50次。对不同的邻域操作进行实验，取5次随机运行后所得的最好解、最差解、平均值、标准差作为指标显示如下，百分比为相对于最优解的百分比：
+\begin{table}[H]
+\centering
+\caption{局部搜索实验结果}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{局部搜索} & \textbf{最好解}     & \textbf{最差解}     & \textbf{平均值}     & \textbf{标准差}    \\ \hline
+\textbf{两点交换} & 45.38\%          & 66.42\%          & 58.15\%          & 8.26\%          \\ \hline
+\textbf{区间翻转} & \textbf{13.47\%} & \textbf{19.41\%} & \textbf{15.55\%} & \textbf{2.23\%} \\ \hline
+\textbf{随机置顶} & 149.45\%         & 181.80\%         & 159.88\%         & 12.36\%         \\ \hline
+\end{tabular}
+\end{table}
+从结果可以得到，采用区间翻转邻域操作的局部搜索效果最优，最优解与目前最优值的差值达到了13.47\%，其余邻域操作的效果相比区间翻转操作有大幅度的下降。绘制区间翻转的最优解如下所示：
+\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.5\linewidth]{ls_b}
+		\caption{采用区间翻转邻域操作的局部搜索最优解}
+\end{figure}
+
+
+\subsection{模拟退火}
+	模拟退火相比局部搜索优越的地方在于其能够通过接受劣解来达到最终获得更优解的效果。其接受劣解的概率由Metropolis准则决定，通过劣解与目前最优解目标值的距离以及当前温度来决定接收劣解的概率，模拟退火的流程图和伪代码图\ref{flow}所示。
+	\begin{figure}[htbp]]
+		\centering
+		\includegraphics[width=1\linewidth]{sa_flow}
+		\caption{模拟退火的流程图和伪代码}
+		\label{flow}
+	\end{figure}
+		
+\subsubsection{实验设置及结果}
+随机初始化解，采用早停法，设置内循环次数为解长度的10倍，早停法容忍次数设置为50次。对不同的邻域操作进行实验，取5次随机运行后所得的最好解、最差解、平均值、标准差作为指标显示如下，百分比为相对于最优解的百分比：
+\begin{table}[H]
+\centering
+\caption{模拟退火实验结果}
+\label{sa}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{模拟退火} & \textbf{最好解}    & \textbf{最差解}     & \textbf{平均值}     & \textbf{标准差}    \\ \hline
+\textbf{两点交换} & 13.66\%         & 25.04\%          & 17.97\%          & \textbf{3.90\%} \\ \hline
+\textbf{区间翻转} & \textbf{6.08\%} & \textbf{29.28\%} & \textbf{16.06\%} & 8.10\%          \\ \hline
+\textbf{随机置顶} & 119.33\%        & 141.59\%         & 125.93\%         & 8.15\%          \\ \hline
+\end{tabular}
+\end{table}
+从结果可以得到，与局部搜索结果类似，采用区间翻转邻域操作的效果最优，最优解与目前最优值的差值达到了6.08\%，其余邻域操作的效果相比区间翻转操作有些微的下降，但是相比与局部搜索可得，模拟退火使得效果有了明显的提升。绘制区间翻转的最优解如下所示：
+\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.5\linewidth]{sa_b}
+		\caption{采用区间翻转邻域操作的模拟退火最优解}
+\end{figure}
+
+
+\subsection{改进：混合邻域操作}
+	根据上述结果可得，采用区间翻转的效果相比使用其他的邻域操作效果更好，但是考虑到仅一种邻域操作对解的搜索强度不如随机选取邻域操作，因此结合先验知识，采用混合邻域操作，选取两点交换、区间翻转、随机置顶邻域操作的概率为[0.01, 0.98, 0.01]，随机选取可以简单地通过numpy库的choice函数进行实现：
+	\begin{lstlisting}[language=python]
+		func = np.random.choice([self.neighbour_swap, self.neighbour_two_opt_swap, self.neighbour_two_h_opt_swap], p=[0.01, 0.98, 0.01])
+	\end{lstlisting}
+	
+	LS代表局部搜索、SA代表模拟退火，实验结果对比为：
+\begin{table}[H]
+\centering
+\caption{实验结果}
+\label{all}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{方案}                            & \textbf{最好解}    & \textbf{最差解}     & \textbf{平均值}     & \textbf{标准差}    \\ \hline
+\textbf{两点交换-LS} & 45.38\%  & 66.42\%  & 58.15\%  & 8.26\%  \\ \hline
+\textbf{区间翻转-LS} & 13.47\%  & 19.41\%  & 15.55\%  & 2.23\%  \\ \hline
+\textbf{随机置顶-LS} & 149.45\% & 181.80\% & 159.88\% & 12.36\% \\ \hline
+\multicolumn{1}{|l|}{\textbf{混合邻域-LS}} & 11.25\%         & 15.52\%          & 13.63\%          & \textbf{1.52\%} \\ \hline
+\textbf{两点交换-SA} & 13.66\%  & 25.04\%  & 17.97\%  & 3.90\%  \\ \hline
+\textbf{区间翻转-SA} & 6.08\%   & 29.28\%  & 16.06\%  & 8.10\%  \\ \hline
+\textbf{随机置顶-SA} & 119.33\% & 141.59\% & 125.93\% & 8.15\%  \\ \hline
+\multicolumn{1}{|l|}{\textbf{混合邻域-SA}} & \textbf{4.15\%} & \textbf{16.48\%} & \textbf{11.24\%} & 4.76\%          \\ \hline
+\end{tabular}
+\end{table}
+
+   从结果可以得到，采用混合邻域操作的模拟退火算法效果最优，达到了4.15\%。采用混合邻域操作后，不管是局部搜索还是模拟退火算法的效果都有显著的提升，显示了混合邻域操作的优越性。绘制最终的得到的最优解如下所示：
+   \begin{figure}[H]
+   		\centering
+   		\includegraphics[width=0.5\linewidth]{sa_br}
+   		\caption{最终得到的最优解}
+   \end{figure}
+
+	
+\section{结论-模拟退火算法}
+	在本次实验中，我们小组实现了局部搜索和模拟退火算法，并且就多种邻域操作进行了对比。实验结果显示了区间翻转邻域操作在寻找TSP解上具有一定的优越性；并且结果显示，采取单一邻域操作的效果比不上结合先验知识，依据概率选取邻域操作的混合邻域操作；并且混合邻域操作对于局部搜索和模拟退火两个算法的效果都有提升。
+	
+
+\section{实验过程-遗传算法}
+   所用的具体的算法思想流程；
+   实现算法的程序主要流程，功能说明；
+%hc
+
+\section{结果分析-遗传算法}
+	%hc
+   交代实验环境，算法设计设计的参数说明；
+   结果（图或表格），比如在若干次运行后所得的最好解，最差解，平均值，标准差。
+   分析算法的性能，包括解的精度，算法的速度，或者与其他算法的对比分析。
+   算法的优缺点；本实验的不足之处，进一步改进的设想。
+\section{结论-遗传算法}
+%hc 注：对比一下模拟退火的单点和多点结果比较
+	在本次实验中
+	
+	
+   简要结论或者体会。
+
+%\section{错误检测与恢复实验结果截图}
+%\begin{figure}[H]
+%	\centering
+%	\includegraphics[width=1\linewidth]{errinput}
+%	\caption{错误样例输入}
+%\end{figure}
+%\subsection{实验结果}
+%\begin{figure}[H]
+%	\centering
+%	\includegraphics[width=1\linewidth]{cuowu}
+%	\caption{错误检测与恢复实验结果}
+%\end{figure}
+%\begin{appendices}
+%\end{appendices}
+%
+\begin{thebibliography}{99}
+	\bibitem{1} Lin S . Computer solutions of the traveling salesman problem[J]. Bell Labs Technical Journal, 1965, 44(10):2245-2269.
+	
+	\bibitem{2} Yang W H, Mathur K, Ballou R H. Stochastic vehicle routing problem with restocking[J]. Transportation Science, 2000, 34(1): 99-11
+	
+	\bibitem{3} Potvin J Y, Rousseau J M. An exchange heuristic for routeing problems with time windows[J]. Journal of the Operational Research Society, 1995, 46(12): 1433-1446.
+
+\end{thebibliography}
+
+\end{document}
